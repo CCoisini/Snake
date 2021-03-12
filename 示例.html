@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        #map {
+            position: relative;
+            width: 400px;
+            height: 400px;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        class Map {
+            constructor(el, rect) {
+                this.el = el;
+                this.data = [];
+                this.rect = rect;
+                this.rows = Math.ceil(Map.getStyle(this.el, "height") / rect);
+                this.cells = Math.ceil(Map.getStyle(this.el, "width") / rect);
+                Map.setStyle(this.el, "width", this.cells * rect);
+                Map.setStyle(this.el, "height", this.rows * rect);
+            }
+            static getStyle(el, attr) {
+                return parseFloat(getComputedStyle(el)[attr]);
+            }
+            static setStyle(el, attr, val) {
+                el.style[attr] = val + "px";
+            }
+            clearData() {
+                this.data.length = 0;
+            }
+            setData(data) {
+                this.data = this.data.concat(data);
+            }
+            include(data) {
+                return this.data.some(item => (item.x == data.x && item.y == data.y));
+            }
+            render() {
+                this.el.innerHTML = this.data.map(item => {
+                    return `
+                <span style="width:${this.rect}px;height:${this.rect}px;position:absolute;left:${this.rect * item.x}px;top:${this.rect * item.y}px;background:${item.color};"></span>
+            `;
+                }).join("");
+            }
+        }
+        class Food {
+            constructor(map) {
+                this.map = map;
+                this.color = ["red", "green", "pink", "yellow"];
+                this.data = null;
+            }
+            create() {
+                let data = {};
+                data.x = Math.floor(Math.random() * this.map.cells);
+                data.y = Math.floor(Math.random() * this.map.rows);
+                if (this.map.include(data)) {
+                    this.create();
+                } else {
+                    data.color = this.color[Math.floor(Math.random() * this.color.length)];
+                    this.map.setData(data);
+                    this.data = data;
+                }
+            }
+        }
+        class Shake {
+            constructor() {
+                this.data = [
+                    { x: 6, y: 2, color: "blue" },
+                    { x: 5, y: 2, color: "white" },
+                    { x: 4, y: 2, color: "white" },
+                    { x: 3, y: 2, color: "white" },
+                    { x: 2, y: 2, color: "white" }
+                ];
+                this.direction = "right";
+            }
+            move() {
+                var i = this.data.length - 1;
+                this.LastData = {
+                    x: this.data[i].x,
+                    y: this.data[i].y,
+                    color: this.data[i].color
+                }
+                for (; i > 0; i--) {
+                    this.data[i].x = this.data[i - 1].x;
+                    this.data[i].y = this.data[i - 1].y;
+                }
+                switch (this.direction) {
+                    case "left": this.data[0].x -= 1; break;
+                    case "right": this.data[0].x += 1; break;
+                    case "top": this.data[0].y -= 1; break;
+                    case "bottom": this.data[0].y += 1; break;
+                }
+            }
+            eatFood(food) {
+                if (food.data.x == this.data[0].x
+                    && food.data.y == this.data[0].y) {
+                    this.data.push(this.LastData);
+                    return true;
+                }
+                return false;
+            }
+
+        }
+        class Game {
+            constructor(el, rect) {
+                this.map = new Map(map, rect);
+                this.food = new Food(this.map);
+                this.shake = new Shake();
+                this.timer = 0;
+                this.grade = 0;
+                this.interval = 200;
+                this.control();
+            }
+            start() {
+                this.food.create();
+                this.move();
+            }
+            stop() {
+                clearInterval(this.timer);
+            }
+            move() {
+                this.stop();
+                this.timer = setInterval(() => {
+                    this.shake.move();
+                    this.map.clearData();
+                    if (this.shake.eatFood(this.food)) {
+                        this.food.create();
+                        this.grade++;
+                        this.gradeChange && this.gradeChange();
+                        if (this.interval > 10) {
+                            this.stop();
+                            this.interval -= 5;
+                            this.move();
+                        }
+                    }
+                    this.map.setData(this.food.data);
+                    this.map.setData(this.shake.data);
+                    if (this.isOver()) {
+                        this.stop();
+                        alert("game over");
+                        return;
+                    }
+                    this.map.render();
+                }, this.interval)
+            }
+            isOver() {
+                // 检测蛇和自己相撞
+                for (let i = 1; i < this.shake.data.length; i++) {
+                    if (this.shake.data[i].x == this.shake.data[0].x
+                        && this.shake.data[i].y == this.shake.data[0].y) {
+                        return true;
+                    }
+                }
+                // 检测蛇超出
+                if (this.shake.data[0].x < 0
+                    || this.shake.data[0].x >= this.map.cells
+                    || this.shake.data[0].y < 0
+                    || this.shake.data[0].y >= this.map.rows) {
+                    return true;
+                }
+                return false;
+            }
+            control() {
+                window.addEventListener("keydown", ({ keyCode }) => {
+                    if (this.shake.direction == "top" || this.shake.direction == "bottom") {
+                        this.shake.direction = keyCode == 37 ? "left" : (keyCode == 39 ? "right" : this.shake.direction);
+                    } else if (this.shake.direction == "left" || this.shake.direction == "right") {
+                        this.shake.direction = keyCode == 38 ? "top" : (keyCode == 40 ? "bottom" : this.shake.direction);
+                    }
+                });
+            }
+        }
+        {
+            let map = document.querySelector("#map");
+            let game = new Game(map, 10);
+            game.start();
+            game.gradeChange = function () {
+                console.log(game.grade);
+            };
+        }
+    </script>
+</body>
+
+</html>
